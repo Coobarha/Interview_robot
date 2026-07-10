@@ -2,82 +2,124 @@
 
 This project is the AI brain and hardware (MRL) connection pipeline for driving a social robot based on the InMoov2 i2 head.
 
-> **Note:** This guide and codebase focus on the core pipeline that connects the robot's intelligence (Python) to its body (MyRobotLab). The ROS2-based simulation parts are excluded from this specific guide.
+> **Scope:** This repository covers the core pipeline connecting the robot's intelligence (Python) to its body (MyRobotLab). The ROS2-based simulation is developed separately and is **not** included in this repository (see `PROGRESS_REPORT.md` for a write-up).
 
 ## 📌 Architecture Overview (Hybrid Strategy)
 
-This project employs a **hybrid strategy** where the burden of hardware control is delegated to MyRobotLab (MRL), while the AI logic is isolated in a separate Python environment.
+The burden of hardware control is delegated to MyRobotLab (MRL), while the AI logic is isolated in a separate Python environment.
 
 ```text
 ┌─────────────────────────────┐        ┌──────────────────────────┐
 │  Brain (Python / ai_brain)  │        │   Body (MRL / MyRobotLab)│
 │                             │  HTTP  │                          │
 │  Mic → STT (Google)         │  API   │  expressEmotion(label)   │
-│    → LLM Logic(Emotion+Chat)───┼───────▶│    → InMoov2 i2 head      │
+│    → LLM Logic(Emotion+Chat)───┼──────▶│    → InMoov2 i2 head      │
 │    → TTS Output (gTTS)      │ :8888  │       (Execute Gestures) │
 └─────────────────────────────┘        └──────────────────────────┘
         (mrl_bridge.py handles this arrow)
 ```
 
-1. **AI Brain (`brain_core.py`)**: Listens to user voice (STT), determines the appropriate response and emotion via an AI model (LLM), and outputs the response via speakers (TTS).
-2. **MRL Bridge (`mrl_bridge.py`)**: Safely transmits the 'emotion' data derived from the Python environment to the MRL server.
-3. **MRL Body**: Receives the `expressEmotion(label)` command via the MRL Web API, interprets it, and moves the actual servo motors (facial expressions).
+1. **AI Brain (`brain_core.py`)**: Listens to user voice (STT), determines response + emotion via an AI model (LLM), and speaks the response (TTS).
+2. **MRL Bridge (`mrl_bridge.py`)**: Safely transmits the 'emotion' from Python to the MRL server.
+3. **MRL Body**: Receives `expressEmotion(label)` via the MRL Web API and moves the servo motors (facial expressions).
 
 ---
 
 ## 🛠 Key Files and Roles
 
-* `ai_brain/brain_core.py` : The main script controlling the entire pipeline (STT ➡️ LLM ➡️ TTS and sending expressions).
-* `ai_brain/mrl_bridge.py` : The communication bridge that calls MRL's REST API to execute Python code within MRL.
-* `ai_brain/requirements.txt` : The list of dependency packages required to run the Python environment.
-* `mrl_setup/emotions.py` : Custom Jython script for MRL that maps emotion labels (e.g., "happy", "기쁨") to specific servo gestures.
+| Path | Role |
+|------|------|
+| `ai_brain/brain_core.py`     | Main pipeline: STT ➡️ LLM ➡️ TTS + send expression |
+| `ai_brain/mrl_bridge.py`     | Bridge: calls MRL REST API to run `expressEmotion` |
+| `ai_brain/requirements.txt`  | Python dependency list |
+| `mrl_setup/emotions.py`      | Custom Jython script for MRL (emotion label → gesture) |
+| `mrl_setup/README.md`        | **Full MRL setup guide (from scratch)** |
+| `mrl_setup/config_backup/`   | Backup of MRL head-servo + virtual-arduino config |
+
+---
+
+## ✅ Prerequisites
+
+- **OS:** Ubuntu 22.04 (tested) · **Python:** 3.10+
+- **Internet connection required** — STT (Google Web Speech) and TTS (gTTS) are online services.
+- **A running MRL instance** exposing `expressEmotion` on port `8888` (see Step 3).
+
+---
+
+## ⚙️ Setup & Run (From Scratch)
+
+### Step 1 — System packages (apt)
+`pyaudio` must be compiled against PortAudio; `flac` is used by SpeechRecognition.
+```bash
+sudo apt update
+sudo apt install -y python3-pip python3-venv portaudio19-dev flac
+```
+
+### Step 2 — AI Brain (Python) environment
+```bash
+cd ai_brain
+python3 -m venv .venv && source .venv/bin/activate   # (recommended, isolates deps)
+pip install -r requirements.txt
+```
+
+### Step 3 — MRL (Body)  ⭐ critical, most commonly missed
+The bridge needs a running MRL where `expressEmotion` is loaded and `i01` (+ head) is started.
+
+**If you do NOT have MRL yet → follow the full guide:**
+➡️ **[`mrl_setup/README.md`](mrl_setup/README.md)**
+(JDK → download MRL → install (with hang workaround) → copy `emotions.py` → start `i01`+head → attach virtual arduino → verify)
+
+**If MRL is already installed (quick version):**
+```bash
+# 1) copy the custom gesture script
+cp mrl_setup/emotions.py /path/to/mrl/myrobotlab-*/resource/InMoov2/gestures/
+# 2) start MRL, then start InMoov2 + head (Web UI Intro tab, or API):
+#    curl "http://localhost:8888/api/service/runtime/start/%22i01%22/%22InMoov2%22"
+#    curl "http://localhost:8888/api/service/i01/startPeer/%22head%22"
+```
+
+**Verify the bridge can reach MRL** (jaw servo should move on "surprise"):
+```bash
+cd ai_brain
+python3 mrl_bridge.py 놀람      # or: python3 mrl_bridge.py surprise
+```
+
+### Step 4 — Run the pipeline
+```bash
+cd ai_brain
+python3 brain_core.py
+```
+Speak into the mic (e.g. "안녕", "깜짝이야") → recognized text is shown → the emotion is sent to MRL
+(face moves) → the response is spoken through the speaker.
+
+> **Note:** MRL must be running and gestures fully loaded (`... Gestures loaded, 0 error`) **before** starting the pipeline.
 
 ---
 
 ## 🚀 Implementation Details & Troubleshooting
 
 ### 1. Suppressing ALSA (PyAudio) Error Logs
-In `brain_core.py`, unnecessary ALSA error messages (like Unknown PCM) that occur during PyAudio and SpeechRecognition initialization are blocked at the C-level using `ctypes`. This keeps the console output clean.
+In `brain_core.py`, noisy ALSA errors during PyAudio/SpeechRecognition init are silenced at the C level via `ctypes`, keeping the console clean.
 
-### 2. MRL (Jython) Korean Encoding & Code Injection Prevention
-MRL's internal Python environment (Jython 2.7) is highly sensitive to handling Korean characters (and other non-ASCII characters). `mrl_bridge.py` applies two safety mechanisms:
-* Uses `json.dumps(label, ensure_ascii=True)` to escape special characters in the LLM output text, preventing code injection.
-* Forces the use of Unicode literal formatting `u"..."` when passing data to MRL, ensuring that Korean emotion labels (e.g., "기쁨", "놀람") are not corrupted and are correctly recognized in the Jython environment.
+### 2. MRL (Jython) Korean Encoding & Code-Injection Prevention
+MRL's internal interpreter is Jython 2.7 and is sensitive to non-ASCII handling. `mrl_bridge.py` applies two safety mechanisms:
+* `json.dumps(label, ensure_ascii=True)` escapes special characters in LLM output → prevents code injection.
+* Passes data as a Unicode literal `u"..."` so Korean labels (e.g. "기쁨", "놀람") are not corrupted in Jython.
 
 ### 3. Modularization with Mock LLM
-Currently, the `mock_llm_logic` function in `brain_core.py` acts as a dummy AI logic based on keyword matching. It is modularized to return a dictionary structure (`{"emotion": "...", "response": "..."}`), making it easy to replace with an actual LLM API (like OpenAI, Anthropic Claude, or Local LLM like Ollama) in the future.
+`mock_llm_logic` in `brain_core.py` is a keyword-matching dummy returning `{"emotion": ..., "response": ...}`, so it can be swapped for a real LLM (OpenAI / Anthropic / Gemini / local Ollama) with minimal changes.
 
----
-
-## ⚙️ How to Run
-
-### 1. Install Dependencies
-Install the required libraries for the Python environment. (You may need system packages like `portaudio19-dev` for PyAudio).
-```bash
-cd ai_brain
-pip install -r requirements.txt
-```
-
-### 2. Configure and Run MRL (MyRobotLab)
-For the MRL bridge to work, MRL needs to know how to handle the `expressEmotion` command. We have provided a custom MRL script for this.
-1. Copy the custom `emotions.py` script to your MRL installation directory:
-   ```bash
-   cp mrl_setup/emotions.py /path/to/your/mrl/myrobotlab-version/resource/InMoov2/gestures/
-   ```
-2. Run your MRL environment and load the `i01` (InMoov2) service. (The HTTP service port `8888` must be open).
-> **Note:** Make sure the MRL server is running and the gestures are fully loaded before starting the AI pipeline.
-
-### 3. Run the AI Pipeline
-While MRL is running, start the AI brain with the command below:
-```bash
-cd ai_brain
-python3 brain_core.py
-```
-* When you speak into the microphone (e.g., "Hello", "I am surprised"), the recognized text is displayed in the terminal, the expression command is sent to MRL, and shortly after, the response is output through the speaker.
-* To test only the MRL bridge independently, you can run `python3 mrl_bridge.py happy`.
+### Common setup issues
+| Symptom | Fix |
+|---------|-----|
+| `pip install pyaudio` fails | `sudo apt install portaudio19-dev` first |
+| STT never recognizes / RequestError | Check internet (Google Web Speech is online) |
+| Bridge prints "MRL 응답 없음" | MRL not running / port 8888 not open / `i01` not started |
+| Expression sent but robot doesn't move | Servos not attached to a controller — see `mrl_setup/README.md` §4 |
 
 ---
 
 ## 📝 Future Improvements
-1. **LLM Integration**: Replace `mock_llm_logic` with a real LLM API (Gemini, GPT-4, etc.) to build a true conversational AI.
-2. **STT Enhancement**: Migrate from the internet-dependent Google Web Speech API to a local Whisper model to improve response speed and support offline environments.
+1. **LLM Integration**: Replace `mock_llm_logic` with a real LLM API (Gemini, GPT, Claude) for true conversation.
+2. **STT Enhancement**: Migrate Google Web Speech → local Whisper for offline speed.
+3. **Hardware**: Connect the physical i2 head servos to a real controller (PCA9685) and calibrate.

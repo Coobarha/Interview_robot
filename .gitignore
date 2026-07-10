@@ -1,0 +1,29 @@
+# ===== ROS2 (이 저장소 범위 밖 — 제외) =====
+src/
+build/
+install/
+log/
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# ===== 실행 중 생성물 =====
+*.log
+*.mp3
+temp_response.mp3
+
+# ===== 대용량 STL (inmoov.fr 에서 각자 다운로드) =====
+# STL 은 용량이 커서(수십 MB) 저장소에 넣지 않음. README 는 유지됨.
+stl/
+*.stl
+
+# ===== OS / IDE =====
+.DS_Store
+.idea/
+.vscode/
+*.swp
