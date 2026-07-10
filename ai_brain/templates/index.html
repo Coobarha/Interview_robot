@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 모의 면접 로봇 컨트롤러</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- 배경 효과 -->
+        <div class="bg-shape bg-shape-1"></div>
+        <div class="bg-shape bg-shape-2"></div>
+
+        <!-- 헤더 -->
+        <header class="glass-panel">
+            <h1>InMoov2 Interview Controller</h1>
+            <div class="status-badge" id="systemStatus">🟢 대기 중</div>
+        </header>
+
+        <!-- 화면 1: 설정 (Setup View) -->
+        <main id="setupView" class="view active glass-panel">
+            <h2>면접 환경 설정</h2>
+            <div class="form-group">
+                <label>타겟 기업 (Company)</label>
+                <select id="companySelect">
+                    <option value="Samsung">삼성전자 (데이터 검증, 트레이드오프 조율)</option>
+                    <option value="Naver">네이버 (CS 기본기, 구조화된 논리)</option>
+                    <option value="Kakao">카카오 (한계 돌파, 오너십)</option>
+                    <option value="Toss">토스 (완벽주의, 극단적 몰입)</option>
+                    <option value="WoowaBrothers">우아한형제들 (이타적 팀워크, 비즈니스 임팩트)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>면접관 성향 (Persona)</label>
+                <select id="styleSelect">
+                    <option value="Strict">깐깐하고 집요한 압박면접관 (Strict)</option>
+                    <option value="Generous">부드럽고 호응을 잘해주는 면접관 (Generous)</option>
+                    <option value="Neutral">무미건조한 원칙주의 면접관 (Neutral)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>지원 직무 (Job Role)</label>
+                <input type="text" id="jobInput" placeholder="예: 프론트엔드 개발, AI 엔지니어" value="AI 로봇 소프트웨어 엔지니어">
+            </div>
+            <button id="startBtn" class="primary-btn pulse-btn">면접 시작하기</button>
+        </main>
+
+        <!-- 화면 2: 면접 진행 (Interview View) -->
+        <main id="interviewView" class="view glass-panel">
+            <div class="interview-header">
+                <h2>실전 모의 면접 진행 중</h2>
+                <div class="timer" id="interviewTimer">00:00</div>
+            </div>
+
+            <!-- 대화 자막 창 -->
+            <div class="chat-container" id="chatBox">
+                <!-- 메시지 예시 (JS에서 동적 생성됨) -->
+            </div>
+
+            <!-- 컨트롤 바 -->
+            <div class="control-bar">
+                <div class="stt-preview">
+                    <span id="sttStatus">🎙️ 마이크 대기 중...</span>
+                    <input type="text" id="mockSttInput" placeholder="[Mock 테스트용] 답변을 직접 텍스트로 입력하세요...">
+                </div>
+                <div class="button-group">
+                    <button id="doneSpeakingBtn" class="primary-btn">✅ 답변 완료</button>
+                    <button id="endInterviewBtn" class="danger-btn">🛑 면접 종료</button>
+                </div>
+            </div>
+        </main>
+
+        <!-- 화면 3: 결과 리포트 (Result View) -->
+        <main id="resultView" class="view glass-panel">
+            <h2>면접 피드백 리포트</h2>
+            <div class="report-content" id="reportBox">
+                <!-- 리포트 내용이 여기에 생성됨 -->
+                <p>로딩 중...</p>
+            </div>
+            <button id="restartBtn" class="primary-btn">다시 시작하기</button>
+        </main>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

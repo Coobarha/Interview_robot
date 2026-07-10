@@ -1,27 +1,29 @@
-# InMoov2 i2 Head - AI Brain & MRL Connection Pipeline
+# InMoov2 i2 Head - AI Mock Interview Robot Pipeline
 
-This project is the AI brain and hardware (MRL) connection pipeline for driving a social robot based on the InMoov2 i2 head.
+This project is the AI brain and hardware (MRL) connection pipeline for driving a social robot based on the InMoov2 i2 head. It has been specifically evolved into an **AI Mock Interview System** featuring a Web-based Control UI and a dynamic Persona Engineering system.
 
-> **Scope:** This repository covers the core pipeline connecting the robot's intelligence (Python) to its body (MyRobotLab). The ROS2-based simulation is developed separately and is **not** included in this repository (see `PROGRESS_REPORT.md` for a write-up).
+> **Scope:** This repository covers the core pipeline connecting the robot's intelligence (Python/Flask) to its body (MyRobotLab). The ROS2-based simulation is developed separately and is **not** included in this repository.
 
-## 📌 Architecture Overview (Hybrid Strategy)
+---
 
-The burden of hardware control is delegated to MyRobotLab (MRL), while the AI logic is isolated in a separate Python environment.
+## 📌 Architecture Overview (Web UI + Hybrid Strategy)
+
+The burden of hardware control is delegated to MyRobotLab (MRL), while the AI logic and User Interface are isolated in a separate Python (Flask) environment.
 
 ```text
-┌─────────────────────────────┐        ┌──────────────────────────┐
-│  Brain (Python / ai_brain)  │        │   Body (MRL / MyRobotLab)│
-│                             │  HTTP  │                          │
-│  Mic → STT (Google)         │  API   │  expressEmotion(label)   │
-│    → LLM Logic(Emotion+Chat)───┼──────▶│    → InMoov2 i2 head      │
-│    → TTS Output (gTTS)      │ :8888  │       (Execute Gestures) │
-└─────────────────────────────┘        └──────────────────────────┘
-        (mrl_bridge.py handles this arrow)
+┌──────────────────────────────────────┐        ┌──────────────────────────┐
+│      AI Brain (Flask / Python)       │        │   Body (MRL / MyRobotLab)│
+│                                      │  HTTP  │                          │
+│  [Web UI] Setup & Chat Interface     │  API   │  expressEmotion(label)   │
+│    → Persona YAML Injection          │───┼──────▶│    → InMoov2 i2 head      │
+│    → LLM Logic (Emotion + Chat)      │ :8888  │       (Execute Gestures) │
+└──────────────────────────────────────┘        └──────────────────────────┘
 ```
 
-1. **AI Brain (`brain_core.py`)**: Listens to user voice (STT), determines response + emotion via an AI model (LLM), and speaks the response (TTS).
-2. **MRL Bridge (`mrl_bridge.py`)**: Safely transmits the 'emotion' from Python to the MRL server.
-3. **MRL Body**: Receives `expressEmotion(label)` via the MRL Web API and moves the servo motors (facial expressions).
+1. **Web UI (`web_app.py`)**: A Flask-based dashboard where users can select the target company and interviewer persona, and conduct the interview interactively.
+2. **Persona System (`personas/`)**: YAML files containing deep psychological and technical criteria for top IT companies (Samsung, Naver, Kakao, Toss, Woowa Brothers) and interviewer styles (Strict, Generous, Neutral).
+3. **MRL Bridge (`mrl_bridge.py`)**: Safely transmits the 'emotion' determined by the LLM from Python to the MRL server.
+4. **MRL Body**: Receives `expressEmotion(label)` via the MRL Web API and moves the servo motors (facial expressions).
 
 ---
 
@@ -29,27 +31,29 @@ The burden of hardware control is delegated to MyRobotLab (MRL), while the AI lo
 
 | Path | Role |
 |------|------|
-| `ai_brain/brain_core.py`     | Main pipeline: STT ➡️ LLM ➡️ TTS + send expression |
+| `ai_brain/web_app.py`        | **[NEW]** Main Flask Web Server & API backend |
+| `ai_brain/templates/`        | **[NEW]** Single Page Application (SPA) HTML view |
+| `ai_brain/static/`           | **[NEW]** Premium Dark Mode CSS & Vanilla JS Logic |
+| `ai_brain/personas/`         | **[NEW]** System Prompt data (`companies.yaml`, `styles.yaml`) |
+| `ai_brain/brain_core.py`     | Legacy pipeline script (STT ➡️ LLM ➡️ TTS) |
 | `ai_brain/mrl_bridge.py`     | Bridge: calls MRL REST API to run `expressEmotion` |
-| `ai_brain/requirements.txt`  | Python dependency list |
+| `ai_brain/requirements.txt`  | Python dependency list (now includes `Flask`) |
 | `mrl_setup/emotions.py`      | Custom Jython script for MRL (emotion label → gesture) |
 | `mrl_setup/README.md`        | **Full MRL setup guide (from scratch)** |
-| `mrl_setup/config_backup/`   | Backup of MRL head-servo + virtual-arduino config |
 
 ---
 
 ## ✅ Prerequisites
 
 - **OS:** Ubuntu 22.04 (tested) · **Python:** 3.10+
-- **Internet connection required** — STT (Google Web Speech) and TTS (gTTS) are online services.
-- **A running MRL instance** exposing `expressEmotion` on port `8888` (see Step 3).
+- **Internet connection required** — STT/TTS and LLM APIs are online services.
+- **A running MRL instance** exposing `expressEmotion` on port `8888`.
 
 ---
 
 ## ⚙️ Setup & Run (From Scratch)
 
 ### Step 1 — System packages (apt)
-`pyaudio` must be compiled against PortAudio; `flac` is used by SpeechRecognition.
 ```bash
 sudo apt update
 sudo apt install -y python3-pip python3-venv portaudio19-dev flac
@@ -58,68 +62,43 @@ sudo apt install -y python3-pip python3-venv portaudio19-dev flac
 ### Step 2 — AI Brain (Python) environment
 ```bash
 cd ai_brain
-python3 -m venv .venv && source .venv/bin/activate   # (recommended, isolates deps)
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### Step 3 — MRL (Body)  ⭐ critical, most commonly missed
+### Step 3 — MRL (Body)  ⭐ critical
 The bridge needs a running MRL where `expressEmotion` is loaded and `i01` (+ head) is started.
+*(If you do NOT have MRL yet → follow the full guide in [`mrl_setup/README.md`](mrl_setup/README.md))*
 
-**If you do NOT have MRL yet → follow the full guide:**
-➡️ **[`mrl_setup/README.md`](mrl_setup/README.md)**
-(JDK → download MRL → install (with hang workaround) → copy `emotions.py` → start `i01`+head → attach virtual arduino → verify)
-
-**If MRL is already installed (quick version):**
-```bash
-# 1) copy the custom gesture script
-cp mrl_setup/emotions.py /path/to/mrl/myrobotlab-*/resource/InMoov2/gestures/
-# 2) start MRL, then start InMoov2 + head (Web UI Intro tab, or API):
-#    curl "http://localhost:8888/api/service/runtime/start/%22i01%22/%22InMoov2%22"
-#    curl "http://localhost:8888/api/service/i01/startPeer/%22head%22"
-```
-
-**Verify the bridge can reach MRL** (jaw servo should move on "surprise"):
+**Verify the bridge can reach MRL:**
 ```bash
 cd ai_brain
-python3 mrl_bridge.py 놀람      # or: python3 mrl_bridge.py surprise
+python3 mrl_bridge.py 놀람
 ```
 
-### Step 4 — Run the pipeline
+### Step 4 — Run the Web UI Dashboard
 ```bash
 cd ai_brain
-python3 brain_core.py
+python3 web_app.py
 ```
-Speak into the mic (e.g. "안녕", "깜짝이야") → recognized text is shown → the emotion is sent to MRL
-(face moves) → the response is spoken through the speaker.
-
-> **Note:** MRL must be running and gestures fully loaded (`... Gestures loaded, 0 error`) **before** starting the pipeline.
+Open a web browser and navigate to **`http://127.0.0.1:5000`**. You will see the premium dark-mode interface where you can set up the interview environment.
 
 ---
 
-## 🚀 Implementation Details & Troubleshooting
+## 🚀 Implementation Details & Highlights
 
-### 1. Suppressing ALSA (PyAudio) Error Logs
-In `brain_core.py`, noisy ALSA errors during PyAudio/SpeechRecognition init are silenced at the C level via `ctypes`, keeping the console clean.
+### 1. Advanced Persona Engineering (YAML)
+Instead of hardcoding prompts, the system uses structured YAML data. By combining `companies.yaml` (Core values, Green/Red flags) and `styles.yaml` (Tone, Reaction style), the AI generates a highly realistic and tailored interview experience based on the CASA (Computers-Are-Social-Actors) paradigm.
 
-### 2. MRL (Jython) Korean Encoding & Code-Injection Prevention
-MRL's internal interpreter is Jython 2.7 and is sensitive to non-ASCII handling. `mrl_bridge.py` applies two safety mechanisms:
-* `json.dumps(label, ensure_ascii=True)` escapes special characters in LLM output → prevents code injection.
-* Passes data as a Unicode literal `u"..."` so Korean labels (e.g. "기쁨", "놀람") are not corrupted in Jython.
+### 2. Premium UI/UX
+The front-end uses Glassmorphism and modern Dark Mode aesthetics. It features a chat-like transcript view, a timer, and explicit `[Done Speaking]` buttons to solve the common STT cutoff issue during long pauses.
 
-### 3. Modularization with Mock LLM
-`mock_llm_logic` in `brain_core.py` is a keyword-matching dummy returning `{"emotion": ..., "response": ...}`, so it can be swapped for a real LLM (OpenAI / Anthropic / Gemini / local Ollama) with minimal changes.
-
-### Common setup issues
-| Symptom | Fix |
-|---------|-----|
-| `pip install pyaudio` fails | `sudo apt install portaudio19-dev` first |
-| STT never recognizes / RequestError | Check internet (Google Web Speech is online) |
-| Bridge prints "MRL 응답 없음" | MRL not running / port 8888 not open / `i01` not started |
-| Expression sent but robot doesn't move | Servos not attached to a controller — see `mrl_setup/README.md` §4 |
+### 3. MRL (Jython) Code-Injection Prevention
+MRL's internal interpreter is Jython 2.7. `mrl_bridge.py` applies safety mechanisms (`json.dumps`) to escape special characters in LLM outputs, preventing arbitrary code execution.
 
 ---
 
 ## 📝 Future Improvements
-1. **LLM Integration**: Replace `mock_llm_logic` with a real LLM API (Gemini, GPT, Claude) for true conversation.
+1. **Real LLM Integration**: Replace the Mock APIs in `web_app.py` with actual OpenAI/Gemini SDK calls using the loaded YAML personas.
 2. **STT Enhancement**: Migrate Google Web Speech → local Whisper for offline speed.
 3. **Hardware**: Connect the physical i2 head servos to a real controller (PCA9685) and calibrate.
