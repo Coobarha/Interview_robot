@@ -30,6 +30,7 @@ This project employs a **hybrid strategy** where the burden of hardware control 
 * `ai_brain/brain_core.py` : The main script controlling the entire pipeline (STT ➡️ LLM ➡️ TTS and sending expressions).
 * `ai_brain/mrl_bridge.py` : The communication bridge that calls MRL's REST API to execute Python code within MRL.
 * `ai_brain/requirements.txt` : The list of dependency packages required to run the Python environment.
+* `mrl_setup/emotions.py` : Custom Jython script for MRL that maps emotion labels (e.g., "happy", "기쁨") to specific servo gestures.
 
 ---
 
@@ -57,9 +58,14 @@ cd ai_brain
 pip install -r requirements.txt
 ```
 
-### 2. Run MRL (MyRobotLab)
-Run your pre-installed MRL environment. (The InMoov2 service and HTTP service port `8888` must be open).
-> **Note:** Gestures corresponding to emotion labels must be mapped in MRL's internal `emotions.py`.
+### 2. Configure and Run MRL (MyRobotLab)
+For the MRL bridge to work, MRL needs to know how to handle the `expressEmotion` command. We have provided a custom MRL script for this.
+1. Copy the custom `emotions.py` script to your MRL installation directory:
+   ```bash
+   cp mrl_setup/emotions.py /path/to/your/mrl/myrobotlab-version/resource/InMoov2/gestures/
+   ```
+2. Run your MRL environment and load the `i01` (InMoov2) service. (The HTTP service port `8888` must be open).
+> **Note:** Make sure the MRL server is running and the gestures are fully loaded before starting the AI pipeline.
 
 ### 3. Run the AI Pipeline
 While MRL is running, start the AI brain with the command below:
